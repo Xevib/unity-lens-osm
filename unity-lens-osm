@@ -1,0 +1,135 @@
+#! /usr/bin/python
+
+#    Copyright (c) 2011 David Calle <davidc@framli.eu>
+
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import sys
+import os
+from gi.repository import GLib, GObject, Gio
+from gi.repository import Dee
+from gi.repository import Unity
+import urllib2
+import re
+import locale
+import datetime
+import random
+import urllib
+from lxml import etree
+BUS_NAME = "net.launchpad.lens.osm"
+
+class Daemon:
+
+    def __init__ (self):
+        self._lens = Unity.Lens.new ("/net/launchpad/lens/osm", "osm")
+        self._scope = Unity.Scope.new ("/net/launchpad/lens/osm/main")
+        self._lens.props.search_hint = "Search osm"
+        self._lens.props.visible = True;
+
+        self._lens.add_local_scope (self._scope);
+        self._scope.connect("search-changed", self.on_search_changed)
+        self._scope.connect ("activate-uri", self.on_activate_uri);
+        svg_dir = "/usr/share/icons/unity-icon-theme/places/svg/"
+        cats = []
+        cats.append (Unity.Category.new ("Places",
+                                         Gio.ThemedIcon.new(svg_dir+"group-installed.svg"),
+                                         Unity.CategoryRenderer.HORIZONTAL_TILE))
+        self._lens.props.categories = cats
+        locale.setlocale(locale.LC_MESSAGES, '')
+        loc = locale.getlocale(locale.LC_MESSAGES)[0].split("_")[0]
+        self.wiki = ["http://%s.wikipedia.org" % (loc)]
+        self._lens.export ();
+        self._scope.export ();
+
+    def on_search_changed (self, scope, search, search_type, *_):
+        if search_type is Unity.SearchType.DEFAULT:
+            search_string = search.props.search_string.strip ()
+            print "Search changed to \"%s\"" % search_string
+            model = search.props.results_model
+            model.clear ()
+            self.update_results_model(model, search_string)
+            search.set_reply_hint ("no-results-hint", GLib.Variant.new_string("Sorry, there are no articles that match your search."))
+        search.finished ()
+
+    def get_image(self,data):
+        image = "/opt/extras.ubuntu.com/unity-lens-wikipedia/media/wiki_blank-"+str(random.randint(0,1))+".png"   
+        return image
+ 
+    def update_results_model (self, model, search):
+        for site in self.wiki:
+            for i in self.nominatim_query(search):
+                try:
+                    text = i.attrib['display_name']
+                    place_id=i.attrib['place_id']
+                    comment = i.attrib['class']
+                    image = self.get_image(i)
+                except:
+					#the below line can safely be uncommented when CardView layout learns to respect not-square (in this case circlular) icons
+                    #image = "http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png"
+                    #make the thumnails for the artciles without custom thumnails have a square icon, so CardView layout won't draw ugly black outline around those, will become obsolete when CardView layot learns to respect not-square (in this case circlular) icons
+                    place_id=i.attrib['place_id']
+                    image = self.get_image(i)
+                    text = i.attrib['display_name']
+                    comment = i.attrib['class']
+                try:
+                    if comment.endswith(":"):
+                        comment = "may refer to several subjects..."
+                    comment = comment.replace ("()", "")
+                except:
+                    pass
+                model.append("http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id),
+                            image,
+                            0,
+                            "text/html",
+                            text,
+                            comment,
+                            "http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id))
+
+    def nominatim_query(self,search):
+        try:
+            search=urllib.quote(search)
+            url = ("http://nominatim.openstreetmap.org/search/%s?format=xml&addressdetails=1" % (search))
+            parser = etree.XMLParser(ns_clean=True, recover=True)
+            tree=etree.parse(url, parser)
+            root=tree.getroot()
+            print "Searching osm: "+url
+	    return root.getchildren()
+        except (IOError, KeyError, urllib2.URLError, urllib2.HTTPError):
+            print "Error : Unable to search osm"
+            return []
+    
+
+    def on_activate_uri (self, scope, uri):
+#        GLib.spawn_command_line_async('notify-send -i "%s" "%s" "%s"' % ('applications-graphics',notification_title, notification_text))
+        print Unity.ActivationResponse(Unity.HandledType.HIDE_DASH, '')
+#        return Unity.ActivationResponse(Unity.HandledType.HIDE_DASH,'')
+
+if __name__ == "__main__":
+    session_bus_connection = Gio.bus_get_sync (Gio.BusType.SESSION, None)
+    session_bus = Gio.DBusProxy.new_sync (session_bus_connection, 0, None,
+                                          'org.freedesktop.DBus',
+                                          '/org/freedesktop/DBus',
+                                          'org.freedesktop.DBus', None)
+    result = session_bus.call_sync('RequestName',
+                                   GLib.Variant ("(su)", (BUS_NAME, 0x4)),
+                                   0, -1, None)
+                                   
+    result = result.unpack()[0]
+    
+    if result != 1 :
+        print >> sys.stderr, "Failed to own name %s. Bailing out." % BUS_NAME
+        raise SystemExit (1)
+    
+    daemon = Daemon()
+    GObject.MainLoop().run()

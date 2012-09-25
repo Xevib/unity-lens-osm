@@ -1,0 +1,11 @@
+[Lens]
+DBusName=net.launchpad.lens.osm
+DBusPath=/net/launchpad/lens/osm
+Name=osm
+Icon=/opt/extras.ubuntu.com/unity-lens-osm/media/lens-nav-osm.svg
+Description=A Lens for OSM
+SearchHint=Search osm
+Shortcut=e
+
+[Desktop Entry]
+X-Ubuntu-Gettext-Domain=unity-lens-osm
