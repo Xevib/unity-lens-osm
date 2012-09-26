@@ -1,7 +1,4 @@
 #! /usr/bin/python
-
-#    Copyright (c) 2011 David Calle <davidc@framli.eu>
-
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
@@ -48,7 +45,6 @@ class Daemon:
         self._lens.props.categories = cats
         locale.setlocale(locale.LC_MESSAGES, '')
         loc = locale.getlocale(locale.LC_MESSAGES)[0].split("_")[0]
-        self.wiki = ["http://%s.wikipedia.org" % (loc)]
         self._lens.export ();
         self._scope.export ();
 
@@ -63,38 +59,28 @@ class Daemon:
         search.finished ()
 
     def get_image(self,data):
-        image = "/opt/extras.ubuntu.com/unity-lens-wikipedia/media/wiki_blank-"+str(random.randint(0,1))+".png"   
+        image = "/usr/share/icons/openstreetmap/classic.big/unknown.png"   
         return image
  
     def update_results_model (self, model, search):
-        for site in self.wiki:
-            for i in self.nominatim_query(search):
-                try:
-                    text = i.attrib['display_name']
-                    place_id=i.attrib['place_id']
-                    comment = i.attrib['class']
-                    image = self.get_image(i)
-                except:
-					#the below line can safely be uncommented when CardView layout learns to respect not-square (in this case circlular) icons
-                    #image = "http://upload.wikimedia.org/wikipedia/commons/6/63/Wikipedia-logo.png"
-                    #make the thumnails for the artciles without custom thumnails have a square icon, so CardView layout won't draw ugly black outline around those, will become obsolete when CardView layot learns to respect not-square (in this case circlular) icons
-                    place_id=i.attrib['place_id']
-                    image = self.get_image(i)
-                    text = i.attrib['display_name']
-                    comment = i.attrib['class']
-                try:
-                    if comment.endswith(":"):
-                        comment = "may refer to several subjects..."
-                    comment = comment.replace ("()", "")
-                except:
-                    pass
-                model.append("http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id),
-                            image,
-                            0,
-                            "text/html",
-                            text,
-                            comment,
-                            "http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id))
+        for i in self.nominatim_query(search):
+            try:
+                text = i.attrib['display_name']
+                place_id=i.attrib['place_id']
+                comment = i.attrib['class']
+                image = self.get_image(i)
+            except:
+                place_id=i.attrib['place_id']
+                image = self.get_image(i)
+                text = i.attrib['display_name']
+                comment = i.attrib['class']
+            try:
+                if comment.endswith(":"):
+                    comment = "may refer to several subjects..."
+                comment = comment.replace ("()", "")
+            except:
+                pass
+            model.append("http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id),image,0,"text/html",text,comment,"http://nominatim.openstreetmap.org/details.php?place_id=%s" % (place_id))
 
     def nominatim_query(self,search):
         try:
@@ -111,7 +97,6 @@ class Daemon:
     
 
     def on_activate_uri (self, scope, uri):
-#        GLib.spawn_command_line_async('notify-send -i "%s" "%s" "%s"' % ('applications-graphics',notification_title, notification_text))
         print Unity.ActivationResponse(Unity.HandledType.HIDE_DASH, '')
 #        return Unity.ActivationResponse(Unity.HandledType.HIDE_DASH,'')
 
