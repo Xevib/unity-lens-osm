@@ -8,6 +8,7 @@
 
 import os
 import sys
+import stat
 
 try:
     import DistUtilsExtra.auto
@@ -48,7 +49,7 @@ class InstallAndUpdateDataDirectory(DistUtilsExtra.auto.install_auto):
         previous_values = update_config(values)
         DistUtilsExtra.auto.install_auto.run(self)
         update_config(previous_values)
-
+        os.chmod("/opt/extras.ubuntu.com/unity-lens-osm/unity-lens-osm",775)
 
         
 ##################################################################################
